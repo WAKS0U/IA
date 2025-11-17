@@ -1,0 +1,187 @@
+import numpy as np
+
+
+
+int_to_char = {
+    0 : 'u',
+    1 : 'r',
+    2 : 'd',
+    3 : 'l'
+}
+
+policy_one_step_look_ahead = {
+    0 : [-1,0],
+    1 : [0,1],
+    2 : [1,0],
+    3 : [0,-1]
+}
+
+def policy_int_to_char(pi,n):
+
+    pi_char = ['']
+
+    for i in range(n):
+        for j in range(n):
+
+            if i == 0 and j == 0 or i == n-1 and j == n-1:
+
+                continue
+
+            pi_char.append(int_to_char[pi[i,j]])
+
+    pi_char.append('')
+
+    return np.asarray(pi_char).reshape(n,n)
+def policy_evaluation(n, pi, v, P, R, Gamma, threshold):
+    """
+    Computes the state-value function for a given policy.
+    
+    Parameters:
+    ----------
+    n : int
+        Number of states
+    pi : array[int]
+        Deterministic policy mapping each state -> action
+    v : np.ndarray
+        Initial value function estimate (shape: n)
+    P : dict or nested list
+        Transition probabilities P[s][a] = list of (next_state, prob)
+    R : dict or nested list
+        Expected immediate reward R[s][a][s']
+    Gamma : float
+        Discount factor
+    threshold : float
+        Stop when max update < threshold
+    
+    Returns:
+    -------
+    np.ndarray :
+        Estimated value function for policy pi
+    """
+    
+    while True:
+        delta = 0
+        new_v = np.copy(v)
+
+        for s in range(n):
+            a = pi[s]  # action chosen by policy
+            value = 0
+            
+            # iterate over transitions (s -> s')
+            for (s_next, prob) in P[s][a]:
+                reward = R[s][a][s_next]
+                value += prob * (reward + Gamma * v[s_next])
+            
+            delta = max(delta, abs(value - v[s]))
+            new_v[s] = value
+
+        v = new_v
+        
+        if delta < threshold:
+            break
+    
+    return v
+
+def policy_improvement(n, pi, v, P, R, Gamma):
+    """
+    Computes a greedy policy w.r.t. the value function v.
+
+    Parameters
+    ----------
+    n : int
+        Number of states
+    pi : array[int]
+        Current deterministic policy
+    v : np.ndarray
+        Current value function
+    P : transition model
+        P[s][a] = list of (next_state, prob)
+    R : reward model
+        R[s][a][next_state] = reward
+    Gamma : float
+        Discount factor
+
+    Returns
+    -------
+    new_pi : array[int]
+        Greedy improved policy
+    unchanged : bool
+        True if new_pi == pi for all states, else False
+    """
+
+    new_pi = np.copy(pi)
+    unchanged = True
+
+    for s in range(n):
+        # Compute Q(s,a) for all actions
+        num_actions = len(P[s])
+        q_values = np.zeros(num_actions)
+
+        for a in range(num_actions):
+            for (s_next, prob) in P[s][a]:
+                q_values[a] += prob * (R[s][a][s_next] + Gamma * v[s_next])
+
+        # Greedy action
+        best_action = np.argmax(q_values)
+        new_pi[s] = best_action
+
+        if best_action != pi[s]:
+            unchanged = False
+
+    return new_pi, unchanged
+
+def policy_initialization(n, num_actions=4):
+    """
+    Returns a random deterministic policy.
+    
+    Parameters
+    ----------
+    n : int
+        Number of states
+    num_actions : int
+        Number of possible actions for each state
+    
+    Returns
+    -------
+    np.ndarray of size n, where each entry is an action index.
+    """
+    return np.random.randint(0, num_actions, size=n)
+
+def policy_iteration(n,Gamma,threshhold):
+
+    pi = policy_initialization(n=n)
+
+    v = np.zeros(shape=(n,n))
+
+    while True:
+
+        v = policy_evaluation(n=n,v=v,pi=pi,threshhold=threshhold,Gamma=Gamma)
+
+        pi , pi_stable = policy_improvement(n=n,pi=pi,v=v,Gamma=Gamma)
+
+        if pi_stable:
+
+            break
+
+    return pi , v
+Gamma = [0.8,0.9,1]
+
+threshhold = 1e-4
+
+for _gamma in Gamma:
+
+    pi , v = policy_iteration(n=n,Gamma=_gamma,threshhold=threshhold)
+
+    pi_char = policy_int_to_char(n=n,pi=pi)
+
+    print()
+    print("Gamma = ",_gamma)
+
+    print()
+
+    print(pi_char)
+
+    print()
+    print()
+
+    print(v)
